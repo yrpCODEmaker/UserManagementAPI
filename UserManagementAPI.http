@@ -1,0 +1,177 @@
+@UserManagementAPI_HostAddress = http://localhost:5028
+
+### 1. Obtener usuarios paginados por defecto (200 OK)
+GET {{UserManagementAPI_HostAddress}}/api/users
+Accept: application/json
+
+###
+
+### 2. Obtener usuarios con paginación explícita (200 OK)
+GET {{UserManagementAPI_HostAddress}}/api/users?page=1&pageSize=2
+Accept: application/json
+
+###
+
+### 3. Filtrar usuarios por departamento TI y activos (200 OK)
+GET {{UserManagementAPI_HostAddress}}/api/users?department=TI&isActive=true&page=1&pageSize=10
+Accept: application/json
+
+###
+
+### 4. Paginación inválida (400 Bad Request)
+GET {{UserManagementAPI_HostAddress}}/api/users?page=0&pageSize=500
+Accept: application/json
+
+###
+
+### 5. Obtener un usuario por ID existente (200 OK)
+GET {{UserManagementAPI_HostAddress}}/api/users/1
+Accept: application/json
+
+###
+
+### 6. Obtener usuario con ID no positivo (400 Bad Request)
+GET {{UserManagementAPI_HostAddress}}/api/users/0
+Accept: application/json
+
+###
+
+### 7. Obtener usuario con ID negativo (400 Bad Request)
+GET {{UserManagementAPI_HostAddress}}/api/users/-5
+Accept: application/json
+
+###
+
+### 8. Obtener un usuario inexistente (404 Not Found)
+GET {{UserManagementAPI_HostAddress}}/api/users/999
+Accept: application/json
+
+###
+
+### 9. Crear un nuevo usuario válido (201 Created)
+POST {{UserManagementAPI_HostAddress}}/api/users
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "Lucía",
+  "lastName": "Fernández",
+  "email": "lucia.fernandez@techhive.com",
+  "department": "RR.HH.",
+  "role": "Coordinadora de Nómina",
+  "isActive": true
+}
+
+###
+
+### 10. Crear usuario con nombre relleno de espacios demasiado corto (400 Bad Request)
+POST {{UserManagementAPI_HostAddress}}/api/users
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "  A  ",
+  "lastName": "Sánchez",
+  "email": "a.sanchez@techhive.com",
+  "department": "TI",
+  "role": "Analista",
+  "isActive": true
+}
+
+###
+
+### 11. Crear usuario con correo sin TLD válido (400 Bad Request)
+POST {{UserManagementAPI_HostAddress}}/api/users
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "Pedro",
+  "lastName": "Sánchez",
+  "email": "usuario@dominio",
+  "department": "TI",
+  "role": "Analista",
+  "isActive": true
+}
+
+###
+
+### 12. Crear usuario con correo duplicado (409 Conflict)
+POST {{UserManagementAPI_HostAddress}}/api/users
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "Ana",
+  "lastName": "Duplicada",
+  "email": "ana.gomez@techhive.com",
+  "department": "RR.HH.",
+  "role": "Reclutadora",
+  "isActive": true
+}
+
+###
+
+### 13. Actualizar un usuario existente (200 OK)
+PUT {{UserManagementAPI_HostAddress}}/api/users/4
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "Lucía",
+  "lastName": "Fernández Vargas",
+  "email": "lucia.fernandez@techhive.com",
+  "department": "RR.HH.",
+  "role": "Gerente de Nómina",
+  "isActive": true
+}
+
+###
+
+### 14. Actualizar con ID no positivo (400 Bad Request)
+PUT {{UserManagementAPI_HostAddress}}/api/users/0
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "Lucía",
+  "lastName": "Fernández",
+  "email": "lucia.fernandez@techhive.com",
+  "department": "RR.HH.",
+  "role": "Gerente de Nómina",
+  "isActive": true
+}
+
+###
+
+### 15. Actualizar un usuario inexistente (404 Not Found)
+PUT {{UserManagementAPI_HostAddress}}/api/users/999
+Content-Type: application/json
+Accept: application/json
+
+{
+  "firstName": "No",
+  "lastName": "Existe",
+  "email": "no.existe@techhive.com",
+  "department": "TI",
+  "role": "Empleado",
+  "isActive": false
+}
+
+###
+
+### 16. Eliminar usuario con ID negativo (400 Bad Request)
+DELETE {{UserManagementAPI_HostAddress}}/api/users/-1
+Accept: application/json
+
+###
+
+### 17. Eliminar usuario creado (204 No Content)
+DELETE {{UserManagementAPI_HostAddress}}/api/users/4
+Accept: application/json
+
+###
+
+### 18. Eliminar usuario inexistente (404 Not Found)
+DELETE {{UserManagementAPI_HostAddress}}/api/users/999
+Accept: application/json
