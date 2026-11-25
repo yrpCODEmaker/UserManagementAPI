@@ -1,55 +1,89 @@
 @UserManagementAPI_HostAddress = http://localhost:5028
+@AuthToken = techhive-it-token-2026
+
+### --- PRUEBAS DE MIDDLEWARE ---
+
+### M1. Solicitud sin token (401 Unauthorized)
+GET {{UserManagementAPI_HostAddress}}/api/users
+Accept: application/json
+
+###
+
+### M2. Solicitud con token inválido (401 Unauthorized)
+GET {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer token-invalido
+Accept: application/json
+
+###
+
+### M3. Simular excepción no controlada con token válido (500 Internal Server Error)
+GET {{UserManagementAPI_HostAddress}}/api/test-error
+Authorization: Bearer {{AuthToken}}
+Accept: application/json
+
+###
+
+### --- PRUEBAS CRUD AUTENTICADAS ---
 
 ### 1. Obtener usuarios paginados por defecto (200 OK)
 GET {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 2. Obtener usuarios con paginación explícita (200 OK)
 GET {{UserManagementAPI_HostAddress}}/api/users?page=1&pageSize=2
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 3. Filtrar usuarios por departamento TI y activos (200 OK)
 GET {{UserManagementAPI_HostAddress}}/api/users?department=TI&isActive=true&page=1&pageSize=10
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 4. Paginación inválida (400 Bad Request)
 GET {{UserManagementAPI_HostAddress}}/api/users?page=0&pageSize=500
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 5. Obtener un usuario por ID existente (200 OK)
 GET {{UserManagementAPI_HostAddress}}/api/users/1
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 6. Obtener usuario con ID no positivo (400 Bad Request)
 GET {{UserManagementAPI_HostAddress}}/api/users/0
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 7. Obtener usuario con ID negativo (400 Bad Request)
 GET {{UserManagementAPI_HostAddress}}/api/users/-5
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 8. Obtener un usuario inexistente (404 Not Found)
 GET {{UserManagementAPI_HostAddress}}/api/users/999
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 9. Crear un nuevo usuario válido (201 Created)
 POST {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -66,6 +100,7 @@ Accept: application/json
 
 ### 10. Crear usuario con nombre relleno de espacios demasiado corto (400 Bad Request)
 POST {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -82,6 +117,7 @@ Accept: application/json
 
 ### 11. Crear usuario con correo sin TLD válido (400 Bad Request)
 POST {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -98,6 +134,7 @@ Accept: application/json
 
 ### 12. Crear usuario con correo duplicado (409 Conflict)
 POST {{UserManagementAPI_HostAddress}}/api/users
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -114,6 +151,7 @@ Accept: application/json
 
 ### 13. Actualizar un usuario existente (200 OK)
 PUT {{UserManagementAPI_HostAddress}}/api/users/4
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -130,6 +168,7 @@ Accept: application/json
 
 ### 14. Actualizar con ID no positivo (400 Bad Request)
 PUT {{UserManagementAPI_HostAddress}}/api/users/0
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -146,6 +185,7 @@ Accept: application/json
 
 ### 15. Actualizar un usuario inexistente (404 Not Found)
 PUT {{UserManagementAPI_HostAddress}}/api/users/999
+Authorization: Bearer {{AuthToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -162,16 +202,19 @@ Accept: application/json
 
 ### 16. Eliminar usuario con ID negativo (400 Bad Request)
 DELETE {{UserManagementAPI_HostAddress}}/api/users/-1
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 17. Eliminar usuario creado (204 No Content)
 DELETE {{UserManagementAPI_HostAddress}}/api/users/4
+Authorization: Bearer {{AuthToken}}
 Accept: application/json
 
 ###
 
 ### 18. Eliminar usuario inexistente (404 Not Found)
 DELETE {{UserManagementAPI_HostAddress}}/api/users/999
+Authorization: Bearer {{AuthToken}}
 Accept: application/json

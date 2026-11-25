@@ -12,6 +12,10 @@ UserManagementAPI/
 │   └── UsersController.cs          # Endpoints CRUD (/api/users) con try-catch y validación de ID/paginación
 ├── DTOs/
 │   └── UserDtos.cs                 # DTOs con IValidatableObject y PagedResult<T>
+├── Middleware/
+│   ├── ExceptionHandlingMiddleware.cs      # Captura global de excepciones (JSON 500)
+│   ├── TokenAuthenticationMiddleware.cs    # Validación de tokens Bearer (401 Unauthorized)
+│   └── RequestResponseLoggingMiddleware.cs # Auditoría HTTP (método, ruta, estado, duración)
 ├── Models/
 │   └── User.cs                     # Entidad principal de usuario
 ├── Services/
@@ -19,10 +23,11 @@ UserManagementAPI/
 │   └── InMemoryUserRepository.cs   # Repositorio thread-safe con índice O(1) y ReaderWriterLockSlim
 ├── Properties/
 │   └── launchSettings.json         # Perfiles de ejecución local (http://localhost:5028)
-├── Program.cs                      # Configuración de DI, OpenAPI y pipeline HTTP
+├── appsettings.json                # Configuración de logging y Authentication:ValidTokens
+├── Program.cs                      # Configuración de DI, OpenAPI y orden del pipeline HTTP
 ├── UserManagementAPI.csproj        # Definición del proyecto (.NET 10)
-├── UserManagementAPI.http          # Colección de pruebas HTTP (incluye casos extremos)
-└── README.md                       # Documentación de la API, mejoras de Copilot y depuración
+├── UserManagementAPI.http          # Colección de pruebas HTTP (incluye auth, errores y casos extremos)
+└── README.md                       # Documentación de la API, mejoras de Copilot, depuración y middleware
 ```
 
 ---
@@ -157,7 +162,8 @@ Al iniciar, `InMemoryUserRepository` carga 3 registros de ejemplo para pruebas i
 ### 1. Con Postman
 
 1. Inicia la API con `dotnet run` (escuchando en `http://localhost:5028`).
-2. Opcionalmente, importa `http://localhost:5028/openapi/v1.json` en Postman para generar la colección automáticamente, o crea solicitudes manuales apuntando a `http://localhost:5028/api/users`:
+2. Agrega la cabecera de autenticación `Authorization: Bearer techhive-it-token-2026` (o `techhive-hr-token-2026`, configurados en `appsettings.json`) en las solicitudes hacia `/api/users`.
+3. Opcionalmente, importa `http://localhost:5028/openapi/v1.json` en Postman para generar la colección automáticamente, o crea solicitudes manuales apuntando a `http://localhost:5028/api/users`:
    - `GET http://localhost:5028/api/users?page=1&pageSize=20`
    - `GET http://localhost:5028/api/users?department=TI&isActive=true`
    - `GET http://localhost:5028/api/users/1`
@@ -167,7 +173,7 @@ Al iniciar, `InMemoryUserRepository` carga 3 registros de ejemplo para pruebas i
 
 ### 2. Con `UserManagementAPI.http`
 
-El archivo [UserManagementAPI.http](./UserManagementAPI.http) incluye 18 solicitudes listas para ejecutar desde VS Code (extensión REST Client) o Visual Studio, cubriendo operaciones normales y casos extremos (`400`, `404`, `409`).
+El archivo [UserManagementAPI.http](./UserManagementAPI.http) incluye 21 solicitudes listas para ejecutar desde VS Code (extensión REST Client) o Visual Studio, cubriendo pruebas de middleware (`401`, `500`), operaciones CRUD autenticadas y casos extremos (`400`, `404`, `409`).
 
 ### 3. Con `curl` y resultados verificados
 
@@ -239,3 +245,76 @@ Durante el andamiaje inicial de **UserManagementAPI**, Copilot aportó mejoras c
 - **Auditoría dirigida de casos extremos**: Copilot permitió identificar rápidamente fallos sutiles que las pruebas felices iniciales no cubrían (cadenas con espacios antes del `Trim()`, correos sin TLD con `[EmailAddress]`, IDs negativos/cero y ausencia de paginación).
 - **Refactorización segura hacia estructuras eficientes**: Sugirió e integró el patrón `ReaderWriterLockSlim` + índice `_emailIndex` $O(1)$ manteniendo compatibilidad con `IUserRepository` y evitando clonaciones masivas en `GET /api/users`.
 - **Generación de pruebas de regresión y borde**: Aceleró la ampliación de `UserManagementAPI.http` y del script automatizado `curl` con los 17 escenarios verificados de extremo a extremo.
+
+---
+
+## Middleware corporativo: auditoría, gestión de errores y autenticación (Actividad 3)
+
+### Componentes implementados (`Middleware/`)
+
+1. **`ExceptionHandlingMiddleware`** ([Middleware/ExceptionHandlingMiddleware.cs](./Middleware/ExceptionHandlingMiddleware.cs)):
+   - Envuelve la ejecución posterior (`await _next(context)`) en un bloque `try-catch` global.
+   - Registra el detalle completo de la excepción mediante `ILogger<ExceptionHandlingMiddleware>` (`LogError`) y, si la respuesta aún no comenzó a enviarse, limpia el buffer y responde con código `500 Internal Server Error` y JSON uniforme:
+     ```json
+     { "error": "Internal server error." }
+     ```
+2. **`TokenAuthenticationMiddleware`** ([Middleware/TokenAuthenticationMiddleware.cs](./Middleware/TokenAuthenticationMiddleware.cs)):
+   - Carga los tokens autorizados desde `Authentication:ValidTokens` en [appsettings.json](./appsettings.json) (`techhive-hr-token-2026`, `techhive-it-token-2026`) como arreglos de bytes UTF-8 al iniciar.
+   - Exige la cabecera `Authorization: Bearer <token>` en los endpoints de la API (permitiendo `/openapi` en entorno `Development`) y compara los bytes en tiempo constante mediante `CryptographicOperations.FixedTimeEquals`.
+   - Si falta el token o es inválido, registra una advertencia (`401 Unauthorized`), establece `WWW-Authenticate: Bearer` y corta el pipeline retornando `401` con `{ "error": "Unauthorized. Missing or invalid token." }`.
+3. **`RequestResponseLoggingMiddleware`** ([Middleware/RequestResponseLoggingMiddleware.cs](./Middleware/RequestResponseLoggingMiddleware.cs)):
+   - Mide la latencia con `Stopwatch` y registra para cada solicitud autenticada el método HTTP, la ruta, el código de estado final y el tiempo de respuesta en milisegundos (`Audit HTTP {Method} {Path} => {StatusCode} ({ElapsedMs}ms)`).
+   - Si ocurre una excepción no controlada aguas abajo, registra `Audit HTTP {Method} {Path} => 500 (unhandled exception, ...)` y relanza la excepción para que `ExceptionHandlingMiddleware` emita la respuesta estandarizada.
+
+### Orden óptimo de la canalización en `Program.cs`
+
+En [Program.cs](./Program.cs), los middlewares se registran exactamente en el siguiente orden:
+
+1. `app.UseMiddleware<ExceptionHandlingMiddleware>();` — Debe envolver toda la canalización para capturar excepciones de cualquier middleware posterior o controlador.
+2. `app.UseMiddleware<TokenAuthenticationMiddleware>();` — Rechaza peticiones sin token válido en etapas tempranas (`401`), evitando consumir recursos en auditoría detallada, enrutamiento o controladores.
+3. `app.UseMiddleware<RequestResponseLoggingMiddleware>();` — Audita todas las solicitudes autorizadas junto con su código de estado saliente y duración.
+
+### Configuración y uso de tokens
+
+En [appsettings.json](./appsettings.json):
+
+```json
+"Authentication": {
+  "ValidTokens": [
+    "techhive-hr-token-2026",
+    "techhive-it-token-2026"
+  ]
+}
+```
+
+Para pruebas con `curl`:
+
+```bash
+# Rechazo sin token (401)
+curl -i http://127.0.0.1:5099/api/users
+
+# Acceso autorizado (200)
+curl -i -H "Authorization: Bearer techhive-it-token-2026" http://127.0.0.1:5099/api/users
+
+# Simulación de excepción no controlada en Development (500 JSON)
+curl -i -H "Authorization: Bearer techhive-it-token-2026" http://127.0.0.1:5099/api/test-error
+```
+
+### Resultados verificados de middleware y auditoría
+
+| Escenario verificado | Código HTTP | Respuesta / Registro verificado |
+| --- | --- | --- |
+| `GET /api/users` sin cabecera `Authorization` | `401` | `{"error":"Unauthorized. Missing or invalid token."}` + `warn: ... rejected with 401 Unauthorized.` |
+| `GET /api/users` con token inválido | `401` | `{"error":"Unauthorized. Missing or invalid token."}` + `warn: ... rejected with 401 Unauthorized.` |
+| `GET /api/users` con token válido | `200` | `Audit HTTP GET /api/users => 200` |
+| `POST /api/users` con token válido | `201` | `Audit HTTP POST /api/users => 201` |
+| `PUT /api/users/4` con token válido | `200` | `Audit HTTP PUT /api/users/4 => 200` |
+| `DELETE /api/users/4` con token válido | `204` | `Audit HTTP DELETE /api/users/4 => 204` |
+| `GET /api/test-error` con token válido | `500` | `{"error":"Internal server error."}` + `Audit HTTP GET /api/test-error => 500` + `fail: ... Excepción no controlada` |
+| `GET /openapi/v1.json` en `Development` | `200` | Esquema OpenAPI 3.1.1 accesible + `Audit HTTP GET /openapi/v1.json => 200` |
+
+### Cómo contribuyó Microsoft Copilot en la fase de middleware
+
+- **Andamiaje modular**: Generó la estructura base de `ExceptionHandlingMiddleware`, `TokenAuthenticationMiddleware` y `RequestResponseLoggingMiddleware` siguiendo las convenciones de ASP.NET Core (`InvokeAsync(HttpContext)` y `ILogger<T>`).
+- **Seguridad y rendimiento**: Incorporó comparación de tokens en tiempo constante (`CryptographicOperations.FixedTimeEquals`), lectura de tokens desde `IConfiguration` sin valores fijos en el código y cortocircuito temprano para solicitudes no autorizadas.
+- **Ordenamiento y verificación**: Garantizó la secuencia exacta `Errores -> Autenticación -> Registro` en `Program.cs` junto con un endpoint diagnóstico exclusivo de `Development` (`/api/test-error`) para validar de forma segura la captura de excepciones y los registros de auditoría.
